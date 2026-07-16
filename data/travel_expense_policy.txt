@@ -1,0 +1,13 @@
+Travel Expense Policy
+
+Hotel expenses require receipts.
+
+Airfare above £1,000 requires manager approval.
+
+Business class travel requires Director approval.
+
+Taxi receipts are mandatory.
+
+Meals above £100 require explanation.
+
+Expenses must be submitted within 30 days.

@@ -1,0 +1,13 @@
+Supplier Payment Policy
+
+Standard payment terms are 30 days.
+
+Invoices are paid every Friday.
+
+Invoices must be approved before payment.
+
+Invoices under dispute cannot be paid.
+
+Inactive vendors cannot receive payments.
+
+Urgent payments require Finance Director approval.
