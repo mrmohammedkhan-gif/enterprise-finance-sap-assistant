@@ -39,7 +39,7 @@ class SAPClient:
         return self._get(f"/vendors/{vendor_id}")
 
     # -----------------------------------------------------
-    # Invoices
+    # Legacy Invoices
     # -----------------------------------------------------
 
     def get_invoices(
@@ -195,6 +195,139 @@ class SAPClient:
 
         return (
             partner["partner_type"] == "VENDOR"
+            and partner["status"] == "ACTIVE"
+            and partner["payment_block"] is False
+        )
+
+    # -----------------------------------------------------
+    # SAP Purchase Orders
+    # -----------------------------------------------------
+
+    def get_purchase_orders(
+        self,
+        company_code: str | None = None,
+        business_partner: str | None = None,
+        approval_status: str | None = None,
+        po_status: str | None = None,
+    ) -> list[dict]:
+        params: dict[str, Any] = {}
+
+        if company_code:
+            params["company_code"] = company_code
+
+        if business_partner:
+            params["business_partner"] = business_partner
+
+        if approval_status:
+            params["approval_status"] = approval_status
+
+        if po_status:
+            params["po_status"] = po_status
+
+        return self._get(
+            "/purchase-orders",
+            params,
+        )
+
+    def get_purchase_order(
+        self,
+        purchase_order: str,
+    ) -> dict:
+        return self._get(
+            f"/purchase-orders/{purchase_order}"
+        )
+
+    def get_open_purchase_orders(
+        self,
+    ) -> list[dict]:
+        return self._get(
+            "/purchase-orders/open"
+        )
+
+    # -----------------------------------------------------
+    # SAP Accounts Payable
+    # -----------------------------------------------------
+
+    def get_ap_invoices(
+        self,
+        company_code: str | None = None,
+        business_partner: str | None = None,
+        invoice_status: str | None = None,
+        payment_status: str | None = None,
+        matching_status: str | None = None,
+    ) -> list[dict]:
+        params: dict[str, Any] = {}
+
+        if company_code:
+            params["company_code"] = company_code
+
+        if business_partner:
+            params["business_partner"] = business_partner
+
+        if invoice_status:
+            params["invoice_status"] = invoice_status
+
+        if payment_status:
+            params["payment_status"] = payment_status
+
+        if matching_status:
+            params["matching_status"] = matching_status
+
+        return self._get(
+            "/ap-invoices",
+            params,
+        )
+
+    def get_ap_invoice(
+        self,
+        invoice_document: str,
+    ) -> dict:
+        return self._get(
+            f"/ap-invoices/{invoice_document}"
+        )
+
+    def get_blocked_ap_invoices(
+        self,
+    ) -> list[dict]:
+        return self._get(
+            "/ap-invoices/blocked"
+        )
+
+    def get_duplicate_ap_invoices(
+        self,
+    ) -> list[dict]:
+        return self._get(
+            "/ap-invoices/duplicates"
+        )
+
+    def get_parked_ap_invoices(
+        self,
+    ) -> list[dict]:
+        return self._get(
+            "/ap-invoices/parked"
+        )
+
+    def is_ap_invoice_ready_for_payment(
+        self,
+        invoice_document: str,
+    ) -> bool:
+        invoice = self.get_ap_invoice(
+            invoice_document
+        )
+
+        partner = self.get_business_partner(
+            invoice["business_partner"]
+        )
+
+        return (
+            invoice["invoice_status"] == "POSTED"
+            and invoice["payment_status"] == "UNPAID"
+            and invoice["payment_block"] is False
+            and invoice["duplicate_check_status"] == "UNIQUE"
+            and invoice["matching_status"] in {
+                "MATCHED",
+                "NON_PO",
+            }
             and partner["status"] == "ACTIVE"
             and partner["payment_block"] is False
         )

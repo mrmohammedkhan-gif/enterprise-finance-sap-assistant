@@ -9,6 +9,11 @@ from src.sap_client import SAPClient
 sap_client = SAPClient()
 
 
+# ---------------------------------------------------------
+# INVOICES
+# ---------------------------------------------------------
+
+
 @tool
 def get_overdue_invoices(minimum_days: int = 1) -> str:
     """Return invoices overdue by at least the specified number of days."""
@@ -27,10 +32,80 @@ def get_open_invoices(minimum_amount: float = 0) -> str:
 
 
 @tool
+def review_invoice_for_approval(
+    invoice_id: str,
+    approval_limit: float = 10000,
+) -> str:
+    """
+    Review an invoice and return an approval recommendation.
+
+    This tool checks vendor status, invoice value and overdue status.
+    It does not approve, post or pay the invoice.
+    """
+    invoice = sap_client.get_invoice(invoice_id)
+    vendor = sap_client.get_vendor(invoice["vendor_id"])
+
+    checks = {
+        "vendor_active": vendor["status"] == "ACTIVE",
+        "within_approval_limit": invoice["amount"] <= approval_limit,
+        "invoice_not_overdue": invoice["status"] != "OVERDUE",
+    }
+
+    failed_reasons: list[str] = []
+
+    if not checks["vendor_active"]:
+        failed_reasons.append("vendor is inactive")
+
+    if not checks["within_approval_limit"]:
+        failed_reasons.append(
+            f"invoice amount exceeds the "
+            f"£{approval_limit:,.0f} approval limit"
+        )
+
+    if not checks["invoice_not_overdue"]:
+        failed_reasons.append("invoice is overdue")
+
+    if not checks["vendor_active"]:
+        recommendation = "REJECT"
+        reason = "The vendor is inactive."
+    elif failed_reasons:
+        recommendation = "REVIEW"
+        reason = (
+            "Manual review is required because "
+            + " and ".join(failed_reasons)
+            + "."
+        )
+    else:
+        recommendation = "APPROVE"
+        reason = "All configured approval checks passed."
+
+    result = {
+        "invoice": invoice,
+        "vendor": vendor,
+        "approval_limit": approval_limit,
+        "checks": checks,
+        "recommendation": recommendation,
+        "reason": reason,
+    }
+
+    return json.dumps(result, indent=2)
+
+
+# ---------------------------------------------------------
+# VENDORS
+# ---------------------------------------------------------
+
+
+@tool
 def get_vendor(vendor_id: str) -> str:
     """Return vendor master data for the specified vendor ID."""
     vendor = sap_client.get_vendor(vendor_id)
     return json.dumps(vendor, indent=2)
+
+
+# ---------------------------------------------------------
+# GENERAL LEDGER
+# ---------------------------------------------------------
 
 
 @tool
@@ -40,13 +115,18 @@ def get_gl_balances(company_code: str = "UK01") -> str:
     return json.dumps(balances, indent=2)
 
 
+# ---------------------------------------------------------
+# SAP ORGANISATION
+# ---------------------------------------------------------
+
+
 @tool
 def get_company_code(company_code: str) -> str:
     """
     Return SAP company-code master data.
 
     Use this tool for questions about company name, country,
-    local currency, chart of accounts, fiscal-year variant,
+    local currency, chart of accounts, fiscal-year variant
     and company-code status.
     """
     company = sap_client.get_company_code(company_code)
@@ -63,7 +143,7 @@ def check_posting_period(
     Check whether an SAP posting period is open.
 
     Use this tool before recommending that a journal entry,
-    invoice, or other finance document can be posted.
+    invoice or other finance document can be posted.
     """
     posting_period = sap_client.get_posting_period(
         company_code=company_code,
@@ -80,6 +160,11 @@ def check_posting_period(
     }
 
     return json.dumps(result, indent=2)
+
+
+# ---------------------------------------------------------
+# SAP BUSINESS PARTNERS
+# ---------------------------------------------------------
 
 
 @tool
@@ -110,7 +195,7 @@ def get_business_partner(business_partner: str) -> str:
 
     Use this tool for questions about a partner's type,
     company code, country, currency, payment terms,
-    payment block, bank account, and status.
+    payment block, bank account and status.
     """
     partner = sap_client.get_business_partner(
         business_partner
@@ -120,9 +205,7 @@ def get_business_partner(business_partner: str) -> str:
 
 @tool
 def list_blocked_business_partners() -> str:
-    """
-    Return all SAP business partners blocked for payment.
-    """
+    """Return all SAP business partners blocked for payment."""
     partners = sap_client.get_blocked_business_partners()
     return json.dumps(partners, indent=2)
 
@@ -184,71 +267,156 @@ def check_business_partner_payment(
     return json.dumps(result, indent=2)
 
 
+# ---------------------------------------------------------
+# SAP PURCHASE ORDERS
+# ---------------------------------------------------------
+
+
 @tool
-def review_invoice_for_approval(
-    invoice_id: str,
-    approval_limit: float = 10000,
+def list_purchase_orders(
+    company_code: str | None = None,
+    business_partner: str | None = None,
+    approval_status: str | None = None,
+    po_status: str | None = None,
 ) -> str:
     """
-    Review an invoice and return an approval recommendation.
+    Return SAP purchase orders using optional filters.
 
-    This tool checks vendor status, invoice value, and overdue status.
-    It does not approve, post, or pay the invoice.
+    Use this tool to filter purchase orders by company code,
+    supplier, approval status or purchase-order status.
     """
-    invoice = sap_client.get_invoice(invoice_id)
-    vendor = sap_client.get_vendor(invoice["vendor_id"])
+    purchase_orders = sap_client.get_purchase_orders(
+        company_code=company_code,
+        business_partner=business_partner,
+        approval_status=approval_status,
+        po_status=po_status,
+    )
+
+    return json.dumps(purchase_orders, indent=2)
+
+
+@tool
+def get_purchase_order(purchase_order: str) -> str:
+    """
+    Return details for a specified SAP purchase order.
+
+    The result includes supplier, company code, total value,
+    approval status, goods receipt, invoice receipt and PO status.
+    """
+    result = sap_client.get_purchase_order(
+        purchase_order
+    )
+
+    return json.dumps(result, indent=2)
+
+
+@tool
+def list_open_purchase_orders() -> str:
+    """Return all SAP purchase orders with an OPEN status."""
+    purchase_orders = sap_client.get_open_purchase_orders()
+    return json.dumps(purchase_orders, indent=2)
+
+
+@tool
+def check_purchase_order_invoice_match(
+    purchase_order: str,
+) -> str:
+    """
+    Check whether a purchase order is ready for invoice matching.
+
+    The check considers PO approval, goods receipt,
+    invoice-receipt status, supplier status and payment block.
+    """
+    po = sap_client.get_purchase_order(purchase_order)
+    partner = sap_client.get_business_partner(
+        po["business_partner"]
+    )
 
     checks = {
-        "vendor_active": vendor["status"] == "ACTIVE",
-        "within_approval_limit": invoice["amount"] <= approval_limit,
-        "invoice_not_overdue": invoice["status"] != "OVERDUE",
+        "po_approved": po["approval_status"] == "APPROVED",
+        "goods_received": (
+            po["goods_receipt_status"] == "RECEIVED"
+        ),
+        "invoice_not_already_matched": (
+            po["invoice_receipt_status"] != "MATCHED"
+        ),
+        "supplier_active": partner["status"] == "ACTIVE",
+        "supplier_not_blocked": (
+            partner["payment_block"] is False
+        ),
     }
 
     failed_reasons: list[str] = []
 
-    if not checks["vendor_active"]:
-        failed_reasons.append("vendor is inactive")
-
-    if not checks["within_approval_limit"]:
+    if not checks["po_approved"]:
         failed_reasons.append(
-            f"invoice amount exceeds the "
-            f"£{approval_limit:,.0f} approval limit"
+            "the purchase order is not approved"
         )
 
-    if not checks["invoice_not_overdue"]:
-        failed_reasons.append("invoice is overdue")
+    if not checks["goods_received"]:
+        failed_reasons.append(
+            "the goods receipt is not complete"
+        )
 
-    if not checks["vendor_active"]:
-        recommendation = "REJECT"
-        reason = "The vendor is inactive."
-    elif failed_reasons:
-        recommendation = "REVIEW"
-        reason = (
-            "Manual review is required because "
+    if not checks["invoice_not_already_matched"]:
+        failed_reasons.append(
+            "the purchase order is already invoice matched"
+        )
+
+    if not checks["supplier_active"]:
+        failed_reasons.append(
+            "the supplier is inactive"
+        )
+
+    if not checks["supplier_not_blocked"]:
+        failed_reasons.append(
+            "the supplier has a payment block"
+        )
+
+    ready_for_matching = all(checks.values())
+
+    if po["invoice_receipt_status"] == "MATCHED":
+        decision = "ALREADY MATCHED"
+        explanation = (
+            "The purchase order has already been matched "
+            "to an invoice."
+        )
+    elif ready_for_matching:
+        decision = "READY FOR INVOICE MATCHING"
+        explanation = (
+            "The purchase order is approved, goods have been "
+            "received and the supplier is active and unblocked."
+        )
+    else:
+        decision = "NOT READY FOR INVOICE MATCHING"
+        explanation = (
+            "The purchase order requires attention because "
             + " and ".join(failed_reasons)
             + "."
         )
-    else:
-        recommendation = "APPROVE"
-        reason = "All configured approval checks passed."
 
     result = {
-        "invoice": invoice,
-        "vendor": vendor,
-        "approval_limit": approval_limit,
+        "purchase_order": po,
+        "business_partner": partner,
         "checks": checks,
-        "recommendation": recommendation,
-        "reason": reason,
+        "ready_for_invoice_matching": ready_for_matching,
+        "decision": decision,
+        "explanation": explanation,
     }
 
     return json.dumps(result, indent=2)
+
+
+# ---------------------------------------------------------
+# FINANCE POLICY RAG
+# ---------------------------------------------------------
 
 
 @tool
 def search_finance_policy(question: str) -> str:
     """
     Search company finance policies for approval, payment,
-    travel, audit, and finance-procedure questions.
+    travel, audit and finance-procedure questions.
     """
     documents = search_finance_policies(question)
 
@@ -263,13 +431,18 @@ def search_finance_policy(question: str) -> str:
     return json.dumps(results, indent=2)
 
 
+# ---------------------------------------------------------
+# CFO DASHBOARD
+# ---------------------------------------------------------
+
+
 @tool
 def get_cfo_dashboard_summary() -> str:
     """
     Return CFO dashboard metrics and key finance risks.
 
     Use this tool for dashboard risks, outstanding AP,
-    overdue exposure, current finance position, and
+    overdue exposure, current finance position and
     largest vendor exposure.
     """
     invoices = sap_client.get_invoices()
@@ -363,6 +536,7 @@ def get_cfo_dashboard_summary() -> str:
 SAP_TOOLS = [
     get_overdue_invoices,
     get_open_invoices,
+    review_invoice_for_approval,
     get_vendor,
     get_gl_balances,
     get_company_code,
@@ -371,7 +545,10 @@ SAP_TOOLS = [
     get_business_partner,
     list_blocked_business_partners,
     check_business_partner_payment,
-    review_invoice_for_approval,
+    list_purchase_orders,
+    get_purchase_order,
+    list_open_purchase_orders,
+    check_purchase_order_invoice_match,
     search_finance_policy,
     get_cfo_dashboard_summary,
 ]
