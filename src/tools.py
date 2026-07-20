@@ -2,9 +2,12 @@ import json
 
 from langchain_core.tools import tool
 
-from src.rag import search_finance_policies
-from src.sap_client import SAPClient
-
+try:
+    from src.rag import search_finance_policies
+    from src.sap_client import SAPClient
+except ModuleNotFoundError:
+    from rag import search_finance_policies
+    from sap_client import SAPClient
 
 sap_client = SAPClient()
 
