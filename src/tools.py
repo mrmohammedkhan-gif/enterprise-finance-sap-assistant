@@ -531,9 +531,226 @@ def get_cfo_dashboard_summary() -> str:
     }
 
     return json.dumps(result, indent=2)
+@tool
+def explain_ap_invoice_status(
+    invoice_document: str,
+) -> str:
+    """
+    Explain why an SAP AP invoice is blocked,
+    parked, duplicated, matched or ready for payment.
+    """
+    invoice = sap_client.get_ap_invoice(invoice_document)
+    partner = sap_client.get_business_partner(
+        invoice["business_partner"]
+    )
 
+    purchase_order = None
+
+    if invoice["purchase_order"]:
+        purchase_order = sap_client.get_purchase_order(
+            invoice["purchase_order"]
+        )
+
+    checks = {
+        "invoice_posted": invoice["invoice_status"] == "POSTED",
+        "invoice_not_blocked": invoice["payment_block"] is False,
+        "invoice_unique": (
+            invoice["duplicate_check_status"] == "UNIQUE"
+        ),
+        "invoice_matched": invoice["matching_status"] in {
+            "MATCHED",
+            "NON_PO",
+        },
+        "supplier_active": partner["status"] == "ACTIVE",
+        "supplier_not_blocked": (
+            partner["payment_block"] is False
+        ),
+    }
+
+    if purchase_order is not None:
+        checks["po_approved"] = (
+            purchase_order["approval_status"] == "APPROVED"
+        )
+        checks["goods_received"] = (
+            purchase_order["goods_receipt_status"] == "RECEIVED"
+        )
+
+    reasons: list[str] = []
+
+    if not checks["invoice_posted"]:
+        reasons.append(
+            f"the invoice status is {invoice['invoice_status']}"
+        )
+
+    if not checks["invoice_not_blocked"]:
+        reasons.append("the invoice has a payment block")
+
+    if not checks["invoice_unique"]:
+        reasons.append("the invoice is flagged as a duplicate")
+
+    if not checks["invoice_matched"]:
+        reasons.append(
+            f"the matching status is "
+            f"{invoice['matching_status']}"
+        )
+
+    if not checks["supplier_active"]:
+        reasons.append("the supplier is inactive")
+
+    if not checks["supplier_not_blocked"]:
+        reasons.append("the supplier has a payment block")
+
+    if purchase_order is not None:
+        if not checks["po_approved"]:
+            reasons.append(
+                "the related purchase order is not approved"
+            )
+
+        if not checks["goods_received"]:
+            reasons.append(
+                "the goods receipt is not complete"
+            )
+
+    ready_for_payment = all(checks.values())
+
+    if ready_for_payment:
+        decision = "READY FOR PAYMENT"
+        explanation = (
+            "The invoice is posted, unique, fully matched, "
+            "unblocked, and the supplier is active and unblocked."
+        )
+    else:
+        decision = "NOT READY FOR PAYMENT"
+        explanation = (
+            "The invoice cannot be paid because "
+            + ", ".join(reasons)
+            + "."
+        )
+
+    result = {
+        "invoice": invoice,
+        "business_partner": partner,
+        "purchase_order": purchase_order,
+        "checks": checks,
+        "ready_for_payment": ready_for_payment,
+        "decision": decision,
+        "explanation": explanation,
+    }
+
+    return json.dumps(result, indent=2)
+
+@tool
+def generate_payment_proposal(
+    company_code: str = "UK01",
+) -> str:
+    """
+    Generate a payment proposal for AP invoices that are ready for payment.
+
+    The proposal excludes blocked, duplicate, unmatched,
+    unposted, inactive-supplier, and supplier-blocked invoices.
+    """
+    invoices = sap_client.get_ap_invoices(
+        company_code=company_code
+    )
+
+    proposed_invoices: list[dict] = []
+    excluded_invoices: list[dict] = []
+
+    total_proposed_amount = 0.0
+
+    for invoice in invoices:
+        partner = sap_client.get_business_partner(
+            invoice["business_partner"]
+        )
+
+        checks = {
+            "invoice_posted": (
+                invoice["invoice_status"] == "POSTED"
+            ),
+            "invoice_unpaid": (
+                invoice["payment_status"] == "UNPAID"
+            ),
+            "invoice_not_blocked": (
+                invoice["payment_block"] is False
+            ),
+            "invoice_unique": (
+                invoice["duplicate_check_status"] == "UNIQUE"
+            ),
+            "invoice_matched": (
+                invoice["matching_status"] in {
+                    "MATCHED",
+                    "NON_PO",
+                }
+            ),
+            "supplier_active": (
+                partner["status"] == "ACTIVE"
+            ),
+            "supplier_not_blocked": (
+                partner["payment_block"] is False
+            ),
+        }
+
+        ready_for_payment = all(checks.values())
+
+        if ready_for_payment:
+            proposed_invoices.append(
+                {
+                    "invoice_document": (
+                        invoice["invoice_document"]
+                    ),
+                    "business_partner": (
+                        invoice["business_partner"]
+                    ),
+                    "vendor_invoice_reference": (
+                        invoice["vendor_invoice_reference"]
+                    ),
+                    "currency": invoice["currency"],
+                    "invoice_amount": (
+                        invoice["invoice_amount"]
+                    ),
+                    "payment_due_date": (
+                        invoice["payment_due_date"]
+                    ),
+                }
+            )
+
+            total_proposed_amount += invoice["invoice_amount"]
+        else:
+            failed_checks = [
+                check_name
+                for check_name, passed in checks.items()
+                if not passed
+            ]
+
+            excluded_invoices.append(
+                {
+                    "invoice_document": (
+                        invoice["invoice_document"]
+                    ),
+                    "failed_checks": failed_checks,
+                }
+            )
+
+    result = {
+        "company_code": company_code,
+        "proposal_status": (
+            "PAYMENT PROPOSAL GENERATED"
+        ),
+        "invoice_count": len(proposed_invoices),
+        "total_proposed_amount": total_proposed_amount,
+        "proposed_invoices": proposed_invoices,
+        "excluded_invoices": excluded_invoices,
+        "note": (
+            "This is a simulated payment proposal. "
+            "No payment has been executed."
+        ),
+    }
+
+    return json.dumps(result, indent=2)
 
 SAP_TOOLS = [
+    generate_payment_proposal,
+    explain_ap_invoice_status,
     get_overdue_invoices,
     get_open_invoices,
     review_invoice_for_approval,
