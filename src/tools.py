@@ -814,6 +814,23 @@ def generate_payment_proposal(
 
     return json.dumps(result, indent=2)
 
+@tool
+def list_gl_accounts() -> list[dict]:
+    """List all General Ledger accounts."""
+    return sap_client.get_gl_accounts()
+
+
+@tool
+def get_gl_account(gl_account: str) -> dict:
+    """Return details for one General Ledger account."""
+    return sap_client.get_gl_account(gl_account)
+
+
+@tool
+def get_gl_accounts_for_chart(chart_of_accounts: str) -> list[dict]:
+    """List all G/L accounts assigned to a Chart of Accounts."""
+    return sap_client.get_gl_accounts_for_chart(chart_of_accounts)
+
 SAP_TOOLS = [
   
     generate_payment_proposal,
@@ -838,5 +855,8 @@ SAP_TOOLS = [
     check_purchase_order_invoice_match,
     search_finance_policy,
     get_cfo_dashboard_summary,
+    list_gl_accounts,
+    get_gl_account,
+    get_gl_accounts_for_chart,
 
 ]
