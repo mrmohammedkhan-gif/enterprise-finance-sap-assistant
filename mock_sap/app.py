@@ -1,3 +1,10 @@
+from mock_sap.journal_entries_data import (
+    get_all_journal_entries,
+    get_journal_entry,
+    get_company_journal_entries,
+)
+
+
 
 from mock_sap.gl_account_data import (
     get_all_gl_accounts,
@@ -537,3 +544,28 @@ def get_gl_account(gl_account: str):
 def get_chart_gl_accounts(chart_of_accounts: str):
     """Return all G/L accounts assigned to one Chart of Accounts."""
     return get_gl_accounts_for_chart(chart_of_accounts)
+
+
+@app.get("/journal-entries")
+def list_journal_entries():
+    """Return all journal entries."""
+    return get_all_journal_entries()
+
+
+@app.get("/journal-entries/{document_number}")
+def get_journal_entry_by_number(document_number: str):
+    """Return one journal entry by document number."""
+    entry = get_journal_entry(document_number)
+
+    if entry is None:
+        return {
+            "error": f"Journal Entry '{document_number}' was not found."
+        }
+
+    return entry
+
+
+@app.get("/company-codes/{company_code}/journal-entries")
+def list_company_journal_entries(company_code: str):
+    """Return journal entries for one Company Code."""
+    return get_company_journal_entries(company_code)
