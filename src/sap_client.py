@@ -28,6 +28,25 @@ class SAPClient:
     def health(self) -> dict:
         return self._get("/health")
 
+    # --------------------------------------------------
+    # Chart of Accounts
+    # --------------------------------------------------
+
+    def get_charts_of_accounts(self) -> list[dict]:
+        return self._get("/chart-of-accounts")
+
+    def get_chart_of_accounts(self, chart_id: str) -> dict:
+        return self._get(f"/chart-of-accounts/{chart_id}")
+
+    def get_charts_for_company_code(
+        self,
+        company_code: str,
+    ) -> list[dict]:
+        return self._get(
+            f"/company-codes/{company_code}/chart-of-accounts"
+        )
+
+
     # -----------------------------------------------------
     # Vendors
     # -----------------------------------------------------

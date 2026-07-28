@@ -1,3 +1,11 @@
+
+from mock_sap.chart_of_accounts_data import (
+    get_all_charts_of_accounts,
+    get_chart_of_accounts_by_id,
+    get_charts_for_company_code,
+)
+
+
 from fastapi import FastAPI, HTTPException
 
 from mock_sap.ap_invoice_data import AP_INVOICES
@@ -453,3 +461,47 @@ def list_gl_balances(
         if balance["company_code"].lower()
         == company_code.lower()
     ]
+
+
+@app.get("/company-codes")
+def list_company_codes():
+    """
+    Return all configured Company Codes.
+    """
+    return get_all_company_codes()
+
+
+@app.get("/company-codes/{company_code}")
+def get_company_code(company_code: str):
+    """
+    Return details for one Company Code.
+    """
+    company = get_company_code_by_id(company_code)
+
+    if company is None:
+        return {
+            "error": f"Company Code '{company_code}' was not found."
+        }
+
+    return company
+
+@app.get("/chart-of-accounts")
+def list_charts_of_accounts():
+    return get_all_charts_of_accounts()
+
+
+@app.get("/chart-of-accounts/{chart_id}")
+def get_chart_of_accounts(chart_id: str):
+    chart = get_chart_of_accounts_by_id(chart_id)
+
+    if chart is None:
+        return {
+            "error": f"Chart of Accounts '{chart_id}' was not found."
+        }
+
+    return chart
+
+
+@app.get("/company-codes/{company_code}/chart-of-accounts")
+def get_company_chart(company_code: str):
+    return get_charts_for_company_code(company_code)

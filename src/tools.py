@@ -135,6 +135,69 @@ def get_company_code(company_code: str) -> str:
     company = sap_client.get_company_code(company_code)
     return json.dumps(company, indent=2)
 
+@tool
+def list_charts_of_accounts() -> str:
+    """
+    Return all configured SAP Charts of Accounts.
+    """
+
+    charts = sap_client.get_charts_of_accounts()
+
+    return json.dumps(charts, indent=2)
+
+
+@tool
+def get_chart_of_accounts(chart_id: str) -> str:
+    """
+    Return one SAP Chart of Accounts.
+    """
+
+    chart = sap_client.get_chart_of_accounts(chart_id)
+
+    return json.dumps(chart, indent=2)
+
+
+@tool
+def get_company_chart_of_accounts(company_code: str) -> str:
+    """
+    Return the Chart(s) of Accounts assigned to a Company Code.
+    """
+
+    charts = sap_client.get_charts_for_company_code(company_code)
+
+    return json.dumps(charts, indent=2)
+@tool
+def get_chart_of_accounts(chart_id: str) -> str:
+    """
+    Return SAP Chart of Accounts master data.
+    """
+
+    chart = sap_client.get_chart_of_accounts(chart_id)
+
+    return json.dumps(chart, indent=2)
+
+
+@tool
+def list_charts_of_accounts() -> str:
+    """
+    Return all configured Charts of Accounts.
+    """
+
+    charts = sap_client.get_charts_of_accounts()
+
+    return json.dumps(charts, indent=2)
+
+
+@tool
+def get_company_charts(company_code: str) -> str:
+    """
+    Return Charts of Accounts assigned to a Company Code.
+    """
+
+    charts = sap_client.get_charts_for_company_code(company_code)
+
+    return json.dumps(charts, indent=2)
+
 
 @tool
 def check_posting_period(
@@ -752,6 +815,7 @@ def generate_payment_proposal(
     return json.dumps(result, indent=2)
 
 SAP_TOOLS = [
+  
     generate_payment_proposal,
     explain_ap_invoice_status,
     get_overdue_invoices,
@@ -760,6 +824,9 @@ SAP_TOOLS = [
     get_vendor,
     get_gl_balances,
     get_company_code,
+    list_charts_of_accounts,
+    get_chart_of_accounts,
+    get_company_chart_of_accounts,
     check_posting_period,
     list_business_partners,
     get_business_partner,
@@ -771,4 +838,5 @@ SAP_TOOLS = [
     check_purchase_order_invoice_match,
     search_finance_policy,
     get_cfo_dashboard_summary,
+
 ]
