@@ -1,4 +1,12 @@
 
+from mock_sap.gl_account_data import (
+    get_all_gl_accounts,
+    get_gl_account_by_id,
+    get_gl_accounts_for_chart,
+)
+
+
+
 from mock_sap.chart_of_accounts_data import (
     get_all_charts_of_accounts,
     get_chart_of_accounts_by_id,
@@ -505,3 +513,27 @@ def get_chart_of_accounts(chart_id: str):
 @app.get("/company-codes/{company_code}/chart-of-accounts")
 def get_company_chart(company_code: str):
     return get_charts_for_company_code(company_code)
+
+@app.get("/gl-accounts")
+def list_gl_accounts():
+    """Return all configured General Ledger accounts."""
+    return get_all_gl_accounts()
+
+
+@app.get("/gl-accounts/{gl_account}")
+def get_gl_account(gl_account: str):
+    """Return details for one General Ledger account."""
+    account = get_gl_account_by_id(gl_account)
+
+    if account is None:
+        return {
+            "error": f"G/L Account '{gl_account}' was not found."
+        }
+
+    return account
+
+
+@app.get("/chart-of-accounts/{chart_of_accounts}/gl-accounts")
+def get_chart_gl_accounts(chart_of_accounts: str):
+    """Return all G/L accounts assigned to one Chart of Accounts."""
+    return get_gl_accounts_for_chart(chart_of_accounts)
