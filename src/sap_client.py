@@ -28,6 +28,19 @@ class SAPClient:
     def health(self) -> dict:
         return self._get("/health")
 
+    def get_gl_accounts(self):
+        """Return all General Ledger accounts."""
+        return self._get("/gl-accounts")
+
+    def get_gl_account(self, gl_account: str):
+        """Return one General Ledger account."""
+        return self._get(f"/gl-accounts/{gl_account}")
+
+    def get_gl_accounts_for_chart(self, chart_of_accounts: str):
+        """Return G/L accounts assigned to a Chart of Accounts."""
+        return self._get(
+            f"/chart-of-accounts/{chart_of_accounts}/gl-accounts"
+        )
     # --------------------------------------------------
     # Chart of Accounts
     # --------------------------------------------------
