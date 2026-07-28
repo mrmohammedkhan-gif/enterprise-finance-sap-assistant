@@ -831,6 +831,23 @@ def get_gl_accounts_for_chart(chart_of_accounts: str) -> list[dict]:
     """List all G/L accounts assigned to a Chart of Accounts."""
     return sap_client.get_gl_accounts_for_chart(chart_of_accounts)
 
+@tool
+def list_journal_entries() -> list[dict]:
+    """List all journal entries."""
+    return sap_client.get_journal_entries()
+
+
+@tool
+def get_journal_entry(document_number: str) -> dict:
+    """Return one journal entry by document number."""
+    return sap_client.get_journal_entry(document_number)
+
+
+@tool
+def get_company_journal_entries(company_code: str) -> list[dict]:
+    """List journal entries for one Company Code."""
+    return sap_client.get_company_journal_entries(company_code)
+
 SAP_TOOLS = [
   
     generate_payment_proposal,
@@ -858,5 +875,8 @@ SAP_TOOLS = [
     list_gl_accounts,
     get_gl_account,
     get_gl_accounts_for_chart,
+    list_journal_entries,
+    get_journal_entry,
+    get_company_journal_entries,
 
 ]

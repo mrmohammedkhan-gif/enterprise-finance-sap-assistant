@@ -41,6 +41,22 @@ class SAPClient:
         return self._get(
             f"/chart-of-accounts/{chart_of_accounts}/gl-accounts"
         )
+
+    def get_journal_entries(self):
+        """Return all journal entries."""
+        return self._get("/journal-entries")
+
+    def get_journal_entry(self, document_number: str):
+        """Return one journal entry by document number."""
+        return self._get(
+            f"/journal-entries/{document_number}"
+        )
+
+    def get_company_journal_entries(self, company_code: str):
+        """Return journal entries for one Company Code."""
+        return self._get(
+            f"/company-codes/{company_code}/journal-entries"
+        )
     # --------------------------------------------------
     # Chart of Accounts
     # --------------------------------------------------
