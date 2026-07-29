@@ -57,6 +57,10 @@ class SAPClient:
         return self._get(
             f"/company-codes/{company_code}/journal-entries"
         )
+
+    def get_trial_balance(self):
+        """Return the calculated Trial Balance."""
+        return self._get("/trial-balance")
     # --------------------------------------------------
     # Chart of Accounts
     # --------------------------------------------------
