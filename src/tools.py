@@ -848,6 +848,11 @@ def get_company_journal_entries(company_code: str) -> list[dict]:
     """List journal entries for one Company Code."""
     return sap_client.get_company_journal_entries(company_code)
 
+@tool
+def get_trial_balance() -> list[dict]:
+    """Return the calculated Trial Balance."""
+    return sap_client.get_trial_balance()
+
 SAP_TOOLS = [
   
     generate_payment_proposal,
@@ -878,5 +883,6 @@ SAP_TOOLS = [
     list_journal_entries,
     get_journal_entry,
     get_company_journal_entries,
+    get_trial_balance,
 
 ]
