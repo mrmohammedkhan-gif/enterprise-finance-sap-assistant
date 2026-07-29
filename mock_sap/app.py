@@ -1,3 +1,7 @@
+
+from mock_sap.trial_balance_data import calculate_trial_balance
+
+
 from mock_sap.journal_entries_data import (
     get_all_journal_entries,
     get_journal_entry,
@@ -52,6 +56,8 @@ def root() -> dict:
 @app.get("/health")
 def health() -> dict:
     return {"status": "healthy"}
+
+
 
 
 # ---------------------------------------------------------
@@ -569,3 +575,8 @@ def get_journal_entry_by_number(document_number: str):
 def list_company_journal_entries(company_code: str):
     """Return journal entries for one Company Code."""
     return get_company_journal_entries(company_code)
+
+@app.get("/trial-balance")
+def get_trial_balance():
+    """Return the calculated Trial Balance."""
+    return calculate_trial_balance()
