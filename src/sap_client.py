@@ -61,6 +61,18 @@ class SAPClient:
     def get_trial_balance(self):
         """Return the calculated Trial Balance."""
         return self._get("/trial-balance")
+
+    def get_financial_statements(self):
+        """Return the complete Financial Statements report."""
+        return self._get("/financial-statements")
+
+    def get_balance_sheet(self):
+        """Return the calculated Balance Sheet."""
+        return self._get("/balance-sheet")
+
+    def get_profit_and_loss(self):
+        """Return the calculated Profit and Loss Statement."""
+        return self._get("/profit-and-loss")
     # --------------------------------------------------
     # Chart of Accounts
     # --------------------------------------------------
