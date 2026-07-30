@@ -1,6 +1,12 @@
 
 from mock_sap.trial_balance_data import calculate_trial_balance
 
+from mock_sap.financial_statements_data import (
+    calculate_financial_statements,
+    get_balance_sheet,
+    get_profit_and_loss,
+)
+
 
 from mock_sap.journal_entries_data import (
     get_all_journal_entries,
@@ -580,3 +586,20 @@ def list_company_journal_entries(company_code: str):
 def get_trial_balance():
     """Return the calculated Trial Balance."""
     return calculate_trial_balance()
+
+@app.get("/financial-statements")
+def get_financial_statements():
+    """Return the complete Financial Statements report."""
+    return calculate_financial_statements()
+
+
+@app.get("/balance-sheet")
+def get_balance_sheet_report():
+    """Return the calculated Balance Sheet."""
+    return get_balance_sheet()
+
+
+@app.get("/profit-and-loss")
+def get_profit_and_loss_report():
+    """Return the calculated Profit and Loss Statement."""
+    return get_profit_and_loss()

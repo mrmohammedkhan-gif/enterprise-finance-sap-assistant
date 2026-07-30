@@ -16,8 +16,10 @@ def calculate_trial_balance():
         }
     )
 
+    # Read every Journal Entry
     for journal in get_all_journal_entries():
 
+        # Read every line item
         for line in journal["line_items"]:
 
             account = line["gl_account"]
@@ -27,6 +29,7 @@ def calculate_trial_balance():
 
     trial_balance = []
 
+    # Build the Trial Balance
     for account in sorted(balances.keys()):
 
         account_info = get_gl_account_by_id(account)
@@ -55,4 +58,22 @@ def calculate_trial_balance():
             }
         )
 
-    return trial_balance
+    # Calculate overall totals
+    total_debits = sum(
+        account["total_debit"]
+        for account in trial_balance
+    )
+
+    total_credits = sum(
+        account["total_credit"]
+        for account in trial_balance
+    )
+
+    # Return full Trial Balance report
+    return {
+        "accounts": trial_balance,
+        "total_debits": total_debits,
+        "total_credits": total_credits,
+        "balances": total_debits == total_credits,
+    }
+
