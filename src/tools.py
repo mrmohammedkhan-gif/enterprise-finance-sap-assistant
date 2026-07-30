@@ -847,11 +847,73 @@ def get_journal_entry(document_number: str) -> dict:
 def get_company_journal_entries(company_code: str) -> list[dict]:
     """List journal entries for one Company Code."""
     return sap_client.get_company_journal_entries(company_code)
-
 @tool
 def get_trial_balance() -> list[dict]:
-    """Return the calculated Trial Balance."""
+    """
+    Return the calculated Trial Balance.
+
+    Use this tool whenever the user asks about:
+
+    - Trial Balance
+    - Bank balance
+    - G/L account balances
+    - Debit balances
+    - Credit balances
+    - Accounts with zero balances
+    - Whether the Trial Balance balances
+    - Account totals
+    - Trial Balance analysis
+
+    The returned data includes:
+
+    - G/L Account
+    - Description
+    - Account Type
+    - Total Debit
+    - Total Credit
+    - Balance
+    - Balance Type
+    """
+
     return sap_client.get_trial_balance()
+
+@tool
+def get_financial_statements() -> dict:
+    """
+    Return the complete Financial Statements report,
+    including the Balance Sheet and Profit and Loss Statement.
+    """
+    return sap_client.get_financial_statements()
+
+
+@tool
+def get_balance_sheet() -> dict:
+    """
+    Return the calculated Balance Sheet.
+
+    Use this tool for questions about:
+    - assets
+    - liabilities
+    - equity
+    - financial position
+    - whether the Balance Sheet balances
+    """
+    return sap_client.get_balance_sheet()
+
+
+@tool
+def get_profit_and_loss() -> dict:
+    """
+    Return the calculated Profit and Loss Statement.
+
+    Use this tool for questions about:
+    - revenue
+    - expenses
+    - net profit
+    - net loss
+    - financial performance
+    """
+    return sap_client.get_profit_and_loss()
 
 SAP_TOOLS = [
   
@@ -884,5 +946,8 @@ SAP_TOOLS = [
     get_journal_entry,
     get_company_journal_entries,
     get_trial_balance,
+    get_financial_statements,
+    get_balance_sheet,
+    get_profit_and_loss,
 
 ]
