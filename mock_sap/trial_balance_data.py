@@ -1,12 +1,14 @@
 from collections import defaultdict
 
-from mock_sap.journal_entries_data import get_all_journal_entries
 from mock_sap.gl_account_data import get_gl_account_by_id
+from mock_sap.journal_entries_data import get_all_journal_entries
+from mock_sap.opening_balances_data import get_all_opening_balances
 
 
-def calculate_trial_balance():
+def calculate_trial_balance() -> dict:
     """
-    Calculate the Trial Balance from all Journal Entries.
+    Calculate the Trial Balance from opening balances
+    and current-period journal entries.
     """
 
     balances = defaultdict(
@@ -16,32 +18,41 @@ def calculate_trial_balance():
         }
     )
 
-    # Read every Journal Entry
+    # Add opening balances first.
+    for opening_balance in get_all_opening_balances():
+        account = opening_balance["gl_account"]
+        amount = float(opening_balance["balance"])
+        balance_type = opening_balance["balance_type"]
+
+        if balance_type == "Debit":
+            balances[account]["debit"] += amount
+
+        elif balance_type == "Credit":
+            balances[account]["credit"] += amount
+
+    # Add current-period journal-entry movements.
     for journal in get_all_journal_entries():
-
-        # Read every line item
         for line in journal["line_items"]:
-
             account = line["gl_account"]
 
-            balances[account]["debit"] += line["debit"]
-            balances[account]["credit"] += line["credit"]
+            balances[account]["debit"] += float(line["debit"])
+            balances[account]["credit"] += float(line["credit"])
 
     trial_balance = []
 
-    # Build the Trial Balance
     for account in sorted(balances.keys()):
-
         account_info = get_gl_account_by_id(account)
+
+        if account_info is None:
+            continue
 
         debit = balances[account]["debit"]
         credit = balances[account]["credit"]
+        net_balance = debit - credit
 
-        balance = debit - credit
-
-        if balance > 0:
+        if net_balance > 0:
             balance_type = "Debit"
-        elif balance < 0:
+        elif net_balance < 0:
             balance_type = "Credit"
         else:
             balance_type = "Balanced"
@@ -51,14 +62,14 @@ def calculate_trial_balance():
                 "gl_account": account,
                 "description": account_info["description"],
                 "account_type": account_info["account_type"],
+                "category": account_info["category"],
                 "total_debit": debit,
                 "total_credit": credit,
-                "balance": abs(balance),
+                "balance": abs(net_balance),
                 "balance_type": balance_type,
             }
         )
 
-    # Calculate overall totals
     total_debits = sum(
         account["total_debit"]
         for account in trial_balance
@@ -69,11 +80,9 @@ def calculate_trial_balance():
         for account in trial_balance
     )
 
-    # Return full Trial Balance report
     return {
         "accounts": trial_balance,
         "total_debits": total_debits,
         "total_credits": total_credits,
-        "balances": total_debits == total_credits,
+        "balances": round(total_debits, 2) == round(total_credits, 2),
     }
-
