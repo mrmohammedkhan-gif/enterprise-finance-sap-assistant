@@ -1,6 +1,46 @@
 
 from mock_sap.trial_balance_data import calculate_trial_balance
 
+from mock_sap.posting_period_data import POSTING_PERIODS
+
+from pydantic import BaseModel
+
+from mock_sap.posting_engine import create_journal_entry
+
+
+from mock_sap.tax_codes_data import (
+    get_all_tax_codes,
+    get_tax_code,
+    get_tax_codes_for_country,
+    get_tax_codes_for_region,
+    get_compound_tax_codes,
+)
+
+from mock_sap.tax_engine import (
+    calculate_single_tax,
+    calculate_compound_tax,
+    build_ap_tax_journal_lines,
+    build_ar_tax_journal_lines,
+)
+
+from mock_sap.vendor_invoices_data import (
+    get_all_vendor_invoices,
+    get_vendor_invoice,
+    get_open_vendor_invoices,
+    get_overdue_vendor_invoices,
+    get_vendor_open_balance,
+)
+
+from mock_sap.vendor_payments_data import (
+    get_all_vendor_payments,
+    get_vendor_payment,
+    get_vendor_payments_for_vendor,
+    get_vendor_payments_for_invoice,
+    post_vendor_payment,
+)
+
+
+
 from mock_sap.financial_statements_data import (
     calculate_financial_statements,
     get_balance_sheet,
@@ -35,7 +75,6 @@ from fastapi import FastAPI, HTTPException
 
 from mock_sap.ap_invoice_data import AP_INVOICES
 from mock_sap.business_partner_data import BUSINESS_PARTNERS
-from mock_sap.organisation_data import COMPANY_CODES, POSTING_PERIODS
 from mock_sap.purchase_order_data import PURCHASE_ORDERS
 from mock_sap.sample_data import GL_BALANCES, INVOICES, VENDORS
 
@@ -48,6 +87,58 @@ app = FastAPI(
     ),
     version="1.0.0",
 )
+
+class JournalEntryRequest(BaseModel):
+    """
+    Data required to create a two-line journal entry.
+    """
+
+    company_code: str
+    debit_gl_account: str
+    credit_gl_account: str
+    amount: float
+    reference: str
+    document_type: str = "SA"
+    currency: str | None = None
+    posting_date: str | None = None
+
+
+class VendorPaymentRequest(BaseModel):
+    """
+    Data required to pay one vendor invoice.
+    """
+
+    invoice_number: str
+    payment_method: str = "BANK_TRANSFER"
+    bank_gl_account: str = "100000"
+    payment_date: str | None = None
+
+class SingleTaxRequest(BaseModel):
+    net_amount: float
+    tax_code: str
+    transaction_date: str | None = None
+
+
+class CompoundTaxRequest(BaseModel):
+    net_amount: float
+    compound_group: str
+    transaction_date: str | None = None
+
+
+class APTaxJournalRequest(BaseModel):
+    net_amount: float
+    expense_gl_account: str
+    accounts_payable_gl_account: str
+    tax_code: str
+    transaction_date: str | None = None
+
+
+class ARTaxJournalRequest(BaseModel):
+    net_amount: float
+    revenue_gl_account: str
+    accounts_receivable_gl_account: str
+    tax_code: str
+    transaction_date: str | None = None
 
 
 @app.get("/")
@@ -110,7 +201,7 @@ def get_posting_period(
             if item["company_code"].lower()
             == company_code.lower()
             and item["fiscal_year"] == fiscal_year
-            and item["period"] == period
+            and item["period_number"] == period
         ),
         None,
     )
@@ -603,3 +694,294 @@ def get_balance_sheet_report():
 def get_profit_and_loss_report():
     """Return the calculated Profit and Loss Statement."""
     return get_profit_and_loss()
+
+@app.post("/journal-entries")
+def post_journal_entry(request: JournalEntryRequest):
+    """
+    Validate and create a new balanced journal entry.
+    """
+
+    try:
+        return create_journal_entry(
+            company_code=request.company_code,
+            debit_gl_account=request.debit_gl_account,
+            credit_gl_account=request.credit_gl_account,
+            amount=request.amount,
+            reference=request.reference,
+            document_type=request.document_type,
+            currency=request.currency,
+            posting_date=request.posting_date,
+        )
+
+    except ValueError as error:
+        return {
+            "error": str(error)
+        }
+
+@app.get("/vendor-invoices")
+def list_vendor_invoices():
+    """Return all vendor invoices."""
+    return get_all_vendor_invoices()
+
+
+@app.get("/vendor-invoices/open")
+def list_open_vendor_invoices(
+    company_code: str | None = None,
+):
+    """Return open vendor invoices."""
+    return get_open_vendor_invoices(company_code)
+
+
+@app.get("/vendor-invoices/overdue")
+def list_overdue_vendor_invoices(
+    as_of_date: str | None = None,
+    company_code: str | None = None,
+):
+    """Return overdue vendor invoices."""
+    return get_overdue_vendor_invoices(
+        as_of_date=as_of_date,
+        company_code=company_code,
+    )
+
+
+@app.get("/vendor-invoices/{invoice_number}")
+def get_vendor_invoice_by_number(invoice_number: str):
+    """Return one vendor invoice."""
+    invoice = get_vendor_invoice(invoice_number)
+
+    if invoice is None:
+        return {
+            "error": f"Vendor invoice '{invoice_number}' was not found."
+        }
+
+    return invoice
+
+
+@app.get("/vendors/{vendor_id}/open-balance")
+def get_vendor_balance(vendor_id: str):
+    """Return one vendor's open invoice balance."""
+    return get_vendor_open_balance(vendor_id)
+
+@app.get("/vendor-payments")
+def list_vendor_payments():
+    """
+    Return all vendor payments.
+    """
+    return get_all_vendor_payments()
+
+
+@app.get("/vendor-payments/{payment_number}")
+def get_vendor_payment_by_number(payment_number: str):
+    """
+    Return one vendor payment.
+    """
+    payment = get_vendor_payment(payment_number)
+
+    if payment is None:
+        return {
+            "error": f"Vendor payment '{payment_number}' was not found."
+        }
+
+    return payment
+
+
+@app.get("/vendors/{vendor_id}/payments")
+def list_vendor_payments_for_vendor(vendor_id: str):
+    """
+    Return all payments for one vendor.
+    """
+    return get_vendor_payments_for_vendor(vendor_id)
+
+
+@app.get("/vendor-invoices/{invoice_number}/payments")
+def list_vendor_payments_for_invoice(invoice_number: str):
+    """
+    Return all payments linked to one vendor invoice.
+    """
+    return get_vendor_payments_for_invoice(invoice_number)
+
+
+@app.post("/vendor-payments")
+def create_vendor_payment(request: VendorPaymentRequest):
+    """
+    Pay one open vendor invoice.
+    """
+    try:
+        return post_vendor_payment(
+            invoice_number=request.invoice_number,
+            payment_method=request.payment_method,
+            bank_gl_account=request.bank_gl_account,
+            payment_date=request.payment_date,
+        )
+
+    except ValueError as error:
+        return {
+            "error": str(error)
+        }
+
+@app.get("/tax-codes")
+def list_tax_codes():
+    """Return all configured tax codes."""
+    return get_all_tax_codes()
+
+@app.get("/tax-codes")
+def list_tax_codes():
+    """Return all configured tax codes."""
+    return get_all_tax_codes()
+
+
+@app.get("/tax-codes/country/{country_code}")
+def list_tax_codes_by_country(country_code: str):
+    """Return active tax codes for one country."""
+    return get_tax_codes_for_country(country_code)
+
+
+@app.get("/tax-codes/country/{country_code}/region/{region_code}")
+def list_tax_codes_by_region(
+    country_code: str,
+    region_code: str,
+):
+    """Return active tax codes for one country and region."""
+    return get_tax_codes_for_region(
+        country_code,
+        region_code,
+    )
+
+
+@app.get("/tax-codes/compound/{compound_group}")
+def list_compound_tax_codes(compound_group: str):
+    """Return tax codes belonging to one compound group."""
+    return get_compound_tax_codes(compound_group)
+
+
+@app.get("/tax-codes/{tax_code}")
+def get_tax_code_by_id(tax_code: str):
+    """Return one tax code."""
+    tax_record = get_tax_code(tax_code)
+
+    if tax_record is None:
+        return {
+            "error": f"Tax code '{tax_code}' was not found."
+        }
+
+    return tax_record
+
+
+@app.get("/tax-codes/{tax_code}")
+def get_tax_code_by_id(tax_code: str):
+    """Return one tax code."""
+    tax_record = get_tax_code(tax_code)
+
+    if tax_record is None:
+        return {
+            "error": f"Tax code '{tax_code}' was not found."
+        }
+
+    return tax_record
+
+
+@app.get("/tax-codes/country/{country_code}")
+def list_tax_codes_by_country(country_code: str):
+    """Return active tax codes for one country."""
+    return get_tax_codes_for_country(country_code)
+
+
+@app.get("/tax-codes/country/{country_code}/region/{region_code}")
+def list_tax_codes_by_region(
+    country_code: str,
+    region_code: str,
+):
+    """Return active tax codes for one country and region."""
+    return get_tax_codes_for_region(
+        country_code,
+        region_code,
+    )
+
+
+@app.get("/tax-codes/compound/{compound_group}")
+def list_compound_tax_codes(compound_group: str):
+    """Return tax codes belonging to one compound group."""
+    return get_compound_tax_codes(compound_group)
+
+
+@app.post("/tax/calculate")
+def calculate_tax(request: SingleTaxRequest):
+    """Calculate one VAT, GST, HST, PST or sales-tax component."""
+    try:
+        return calculate_single_tax(
+            net_amount=request.net_amount,
+            tax_code=request.tax_code,
+            transaction_date=request.transaction_date,
+        )
+
+    except ValueError as error:
+        return {
+            "error": str(error)
+        }
+
+
+@app.post("/tax/calculate-compound")
+def calculate_tax_compound(request: CompoundTaxRequest):
+    """Calculate a compound tax group."""
+    try:
+        return calculate_compound_tax(
+            net_amount=request.net_amount,
+            compound_group=request.compound_group,
+            transaction_date=request.transaction_date,
+        )
+
+    except ValueError as error:
+        return {
+            "error": str(error)
+        }
+
+
+@app.post("/tax/ap-journal-lines")
+def calculate_ap_tax_journal(
+    request: APTaxJournalRequest,
+):
+    """Build AP journal lines including tax."""
+    try:
+        return build_ap_tax_journal_lines(
+            net_amount=request.net_amount,
+            expense_gl_account=request.expense_gl_account,
+            accounts_payable_gl_account=(
+                request.accounts_payable_gl_account
+            ),
+            tax_code=request.tax_code,
+            transaction_date=request.transaction_date,
+        )
+
+    except ValueError as error:
+        return {
+            "error": str(error)
+        }
+
+
+@app.post("/tax/ar-journal-lines")
+def calculate_ar_tax_journal(
+    request: ARTaxJournalRequest,
+):
+    """Build AR journal lines including tax."""
+    try:
+        return build_ar_tax_journal_lines(
+            net_amount=request.net_amount,
+            revenue_gl_account=request.revenue_gl_account,
+            accounts_receivable_gl_account=(
+                request.accounts_receivable_gl_account
+            ),
+            tax_code=request.tax_code,
+            transaction_date=request.transaction_date,
+        )
+
+    except ValueError as error:
+        return {
+            "error": str(error)
+        }
+
+@app.get("/posting-periods")
+def get_posting_periods():
+    """
+    Return all configured posting periods.
+    """
+    return POSTING_PERIODS
