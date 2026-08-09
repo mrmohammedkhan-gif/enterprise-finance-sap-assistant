@@ -190,6 +190,24 @@ class SAPClient:
         """
         return self._get("/health")
 
+    def _post_params(
+        self,
+        path: str,
+        params: dict[str, Any],
+    ) -> Any:
+        """
+        Send a POST request using query parameters.
+        """
+        response = requests.post(
+            f"{self.base_url}{path}",
+            params=params,
+            timeout=15,
+        )
+
+        response.raise_for_status()
+
+        return response.json()   
+
     # -----------------------------------------------------
     # CHART OF ACCOUNTS
     # -----------------------------------------------------
@@ -419,6 +437,95 @@ class SAPClient:
         )
 
         return posting_period["status"] == "OPEN"
+
+       # -----------------------------------------------------
+    # MONTH-END CLOSE MANAGER
+    # -----------------------------------------------------
+
+    def get_close_tasks(
+        self,
+        company_code: str,
+        fiscal_year: int,
+        period_number: int,
+    ) -> dict:
+        """
+        Return month-end close tasks for one accounting period.
+        """
+        return self._get(
+            f"/close-tasks/{company_code}",
+            {
+                "fiscal_year": fiscal_year,
+                "period_number": period_number,
+            },
+        )
+
+
+    def complete_close_task(
+        self,
+        task_id: str,
+        completed_by: str,
+    ) -> dict:
+        """
+        Complete one month-end close task.
+        """
+        return self._post_params(
+            f"/close-tasks/{task_id}/complete",
+            {
+                "completed_by": completed_by,
+            },
+        )
+
+
+    def get_close_readiness(
+        self,
+        company_code: str,
+        fiscal_year: int,
+        period_number: int,
+    ) -> dict:
+        """
+        Return month-end close readiness.
+        """
+        return self._get(
+            f"/close-readiness/{company_code}",
+            {
+                "fiscal_year": fiscal_year,
+                "period_number": period_number,
+            },
+        )
+
+
+    def close_accounting_period(
+        self,
+        company_code: str,
+        fiscal_year: int,
+        period_number: int,
+        approved_by: str,
+    ) -> dict:
+        """
+        Close an accounting period after control checks
+        and human approval.
+        """
+        return self._post_params(
+            "/period-close",
+            {
+                "company_code": company_code,
+                "fiscal_year": fiscal_year,
+                "period_number": period_number,
+                "approved_by": approved_by,
+            },
+        )
+
+
+    def get_close_audit(
+        self,
+        company_code: str,
+    ) -> dict:
+        """
+        Return persistent period-close audit history.
+        """
+        return self._get(
+            f"/close-audit/{company_code}"
+        )
 
     # -----------------------------------------------------
     # VENDORS

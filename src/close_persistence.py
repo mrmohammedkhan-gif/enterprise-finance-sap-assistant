@@ -36,18 +36,16 @@ def initialise_close_database() -> None:
 
         cursor.execute(
             """
-            CREATE TABLE IF NOT EXISTS posting_periods (
+            CREATE TABLE IF NOT EXISTS close_tasks (
+                task_id TEXT PRIMARY KEY,
                 company_code TEXT NOT NULL,
                 fiscal_year INTEGER NOT NULL,
                 period_number INTEGER NOT NULL,
+                task_name TEXT NOT NULL,
                 status TEXT NOT NULL,
-                opened_at TEXT,
-                closed_at TEXT,
-                PRIMARY KEY (
-                    company_code,
-                    fiscal_year,
-                    period_number
-                )
+                owner TEXT NOT NULL,
+                completed_by TEXT,
+                completed_at TEXT
             )
             """
         )
@@ -264,6 +262,141 @@ def get_close_audit_history(
             dict(row)
             for row in rows
         ]
+
+    finally:
+        connection.close()
+
+def save_close_task(
+    task: dict[str, Any],
+) -> None:
+    """
+    Insert or update one month-end close task.
+    """
+    connection = get_connection()
+
+    try:
+        connection.execute(
+            """
+            INSERT INTO close_tasks (
+                task_id,
+                company_code,
+                fiscal_year,
+                period_number,
+                task_name,
+                status,
+                owner,
+                completed_by,
+                completed_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+
+            ON CONFLICT (task_id)
+            DO UPDATE SET
+                company_code = excluded.company_code,
+                fiscal_year = excluded.fiscal_year,
+                period_number = excluded.period_number,
+                task_name = excluded.task_name,
+                status = excluded.status,
+                owner = excluded.owner,
+                completed_by = excluded.completed_by,
+                completed_at = excluded.completed_at
+            """,
+            (
+                task["task_id"],
+                task["company_code"],
+                task["fiscal_year"],
+                task["period_number"],
+                task["task_name"],
+                task["status"],
+                task["owner"],
+                task["completed_by"],
+                task["completed_at"],
+            ),
+        )
+
+        connection.commit()
+
+    finally:
+        connection.close()
+
+
+def get_persisted_close_tasks(
+    company_code: str,
+    fiscal_year: int,
+    period_number: int,
+) -> list[dict[str, Any]]:
+    """
+    Return persisted close tasks for one accounting period.
+    """
+    connection = get_connection()
+
+    try:
+        rows = connection.execute(
+            """
+            SELECT
+                task_id,
+                company_code,
+                fiscal_year,
+                period_number,
+                task_name,
+                status,
+                owner,
+                completed_by,
+                completed_at
+            FROM close_tasks
+            WHERE company_code = ?
+              AND fiscal_year = ?
+              AND period_number = ?
+            ORDER BY task_id
+            """,
+            (
+                company_code.upper(),
+                fiscal_year,
+                period_number,
+            ),
+        ).fetchall()
+
+        return [
+            dict(row)
+            for row in rows
+        ]
+
+    finally:
+        connection.close()
+
+def get_persisted_close_task(
+    task_id: str,
+) -> dict[str, Any] | None:
+    """
+    Return one persisted month-end close task by task ID.
+    """
+    connection = get_connection()
+
+    try:
+        row = connection.execute(
+            """
+            SELECT
+                task_id,
+                company_code,
+                fiscal_year,
+                period_number,
+                task_name,
+                status,
+                owner,
+                completed_by,
+                completed_at
+            FROM close_tasks
+            WHERE task_id = ?
+            """,
+            (
+                task_id.upper(),
+            ),
+        ).fetchone()
+
+        if row is None:
+            return None
+
+        return dict(row)
 
     finally:
         connection.close()

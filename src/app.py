@@ -392,3 +392,348 @@ except Exception as exc:
         "The approval panel is unavailable. "
         "Check that the Mock SAP API is running."
     )
+
+# ---------------------------------------------------------
+# MONTH-END CLOSE MANAGER
+# ---------------------------------------------------------
+
+st.divider()
+st.subheader("Month-End Close Manager")
+
+close_col1, close_col2, close_col3 = st.columns(3)
+
+with close_col1:
+    close_company_code = st.text_input(
+        "Company Code",
+        value="UK01",
+        key="close_company_code",
+    ).upper()
+
+with close_col2:
+    close_fiscal_year = st.number_input(
+        "Fiscal Year",
+        min_value=2020,
+        max_value=2100,
+        value=2027,
+        step=1,
+        key="close_fiscal_year",
+    )
+
+with close_col3:
+    close_period_number = st.number_input(
+        "Period",
+        min_value=1,
+        max_value=12,
+        value=1,
+        step=1,
+        key="close_period_number",
+    )
+
+
+try:
+    posting_period = sap_client.get_posting_period(
+        company_code=close_company_code,
+        fiscal_year=int(close_fiscal_year),
+        period=int(close_period_number),
+    )
+
+    posting_status = posting_period["status"]
+
+except Exception:
+    posting_status = "NOT CONFIGURED"
+
+
+try:
+    readiness = sap_client.get_close_readiness(
+        company_code=close_company_code,
+        fiscal_year=int(close_fiscal_year),
+        period_number=int(close_period_number),
+    )
+
+    readiness_status = readiness["status"]
+
+except Exception:
+    readiness = {
+        "status": "UNAVAILABLE",
+        "checks": [],
+        "blockers": [],
+    }
+
+    readiness_status = "UNAVAILABLE"
+
+
+status_col1, status_col2 = st.columns(2)
+
+with status_col1:
+    st.metric(
+        "Posting Period Status",
+        posting_status,
+    )
+
+with status_col2:
+    st.metric(
+        "Close Readiness",
+        readiness_status,
+    )
+
+
+if readiness_status == "READY":
+    st.success(
+        "All close-readiness controls have passed."
+    )
+
+elif readiness_status == "NOT_READY":
+    st.warning(
+        "The accounting period is not ready to close."
+    )
+
+else:
+    st.info(
+        "Close-readiness information is currently unavailable."
+    )
+
+
+st.markdown("#### Close Readiness Controls")
+
+checks = readiness.get("checks", [])
+
+if checks:
+    checks_table = pd.DataFrame(
+        [
+            {
+                "Control": check["check"],
+                "Result": (
+                    "PASSED"
+                    if check["passed"]
+                    else "FAILED"
+                ),
+                "Message": check["message"],
+            }
+            for check in checks
+        ]
+    )
+
+    st.dataframe(
+        checks_table,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+else:
+    st.info(
+        "No close-readiness controls are available "
+        "for the selected period."
+    )
+
+
+blockers = readiness.get("blockers", [])
+
+if posting_status.upper() == "CLOSED":
+    st.info(
+        "This period is already closed. "
+        "Current close-readiness blockers are not applicable."
+    )
+
+elif blockers:
+    st.markdown("#### Close Blockers")
+
+    for blocker in blockers:
+        st.error(
+            f"{blocker['check']}: {blocker['message']}"
+        )
+
+st.markdown("#### Month-End Close Checklist")
+
+try:
+    close_task_response = sap_client.get_close_tasks(
+        company_code=close_company_code,
+        fiscal_year=int(close_fiscal_year),
+        period_number=int(close_period_number),
+    )
+
+    close_tasks = close_task_response.get(
+        "tasks",
+        [],
+    )
+
+    if close_tasks:
+        for task in close_tasks:
+            task_col1, task_col2, task_col3 = st.columns(
+                [4, 2, 2]
+            )
+
+            with task_col1:
+                st.write(
+                    f"**{task['task_name']}**"
+                )
+
+                st.caption(
+                    f"Owner: {task['owner']}"
+                )
+
+            with task_col2:
+                if task["status"] == "COMPLETED":
+                    st.success("COMPLETED")
+                else:
+                    st.warning(task["status"])
+
+            with task_col3:
+                if task["status"] != "COMPLETED":
+                    if st.button(
+                        "Complete",
+                        key=f"complete_{task['task_id']}",
+                    ):
+                        try:
+                            sap_client.complete_close_task(
+                                task_id=task["task_id"],
+                                completed_by=task["owner"],
+                            )
+
+                            st.success(
+                                f"{task['task_name']} completed."
+                            )
+
+                            st.rerun()
+
+                        except Exception as exc:
+                            st.error(
+                                "The close task could not "
+                                "be completed."
+                            )
+
+                            st.exception(exc)
+
+                else:
+                    completed_by = (
+                        task.get("completed_by")
+                        or "Unknown"
+                    )
+
+                    st.caption(
+                        f"Completed by: {completed_by}"
+                    )
+
+    else:
+        st.info(
+            "No close tasks are configured "
+            "for this accounting period."
+        )
+
+except Exception as exc:
+    st.warning(
+        "Close checklist data is unavailable."
+    )
+
+    st.exception(exc)
+
+
+st.markdown("#### Human Approval and Period Close")
+
+if posting_status.upper() == "CLOSED":
+    st.success(
+        "This accounting period is already closed."
+    )
+
+    try:
+        audit_response = sap_client.get_close_audit(
+            close_company_code
+        )
+
+        audit_history = audit_response.get(
+            "audit_history",
+            [],
+        )
+
+        matching_close = next(
+            (
+                record
+                for record in audit_history
+                if record["company_code"] == close_company_code
+                and record["fiscal_year"] == int(close_fiscal_year)
+                and record["period_number"] == int(close_period_number)
+                and record["action"] == "PERIOD_CLOSED"
+            ),
+            None,
+        )
+
+        if matching_close:
+            summary_col1, summary_col2, summary_col3 = st.columns(3)
+
+            with summary_col1:
+                st.metric(
+                    "Approved By",
+                    matching_close["approved_by"],
+                )
+
+            with summary_col2:
+                st.metric(
+                    "Readiness at Close",
+                    matching_close["readiness_status"],
+                )
+
+            with summary_col3:
+                st.metric(
+                    "Audit ID",
+                    matching_close["id"],
+                )
+
+            st.caption(
+                f"Closed at: {matching_close['action_at']}"
+            )
+
+    except Exception:
+        st.info(
+            "The period is closed, but the close summary "
+            "could not be loaded."
+        )
+
+else:
+    approver = st.text_input(
+        "Approved By",
+        placeholder="Finance Manager",
+        key="period_close_approver",
+    )
+
+    close_disabled = (
+        readiness_status != "READY"
+        or posting_status.upper() != "OPEN"
+    )
+
+    if st.button(
+        "Close Accounting Period",
+        type="primary",
+        disabled=close_disabled,
+        key="close_accounting_period",
+    ):
+        try:
+            if not approver.strip():
+                st.error(
+                    "A human approver is required."
+                )
+
+            else:
+                close_result = (
+                    sap_client.close_accounting_period(
+                        company_code=close_company_code,
+                        fiscal_year=int(close_fiscal_year),
+                        period_number=int(
+                            close_period_number
+                        ),
+                        approved_by=approver,
+                    )
+                )
+
+                st.success(
+                    "Accounting period closed successfully."
+                )
+
+                st.json(close_result)
+
+                st.rerun()
+
+        except Exception as exc:
+            st.error(
+                "The accounting period could not be closed."
+            )
+
+            st.exception(exc)

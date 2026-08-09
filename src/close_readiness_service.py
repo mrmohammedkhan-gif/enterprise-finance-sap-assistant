@@ -4,7 +4,7 @@ from mock_sap.journal_entries_data import get_company_journal_entries
 from mock_sap.trial_balance_data import calculate_trial_balance
 from mock_sap.vendor_invoices_data import get_all_vendor_invoices
 from src.posting_period_service import find_posting_period
-
+from src.close_task_service import get_close_tasks
 
 def check_close_readiness(
     company_code: str,
@@ -13,11 +13,38 @@ def check_close_readiness(
 ) -> dict[str, Any]:
     """
     Assess whether a Company Code is ready for month-end close.
-    """
 
+    """
+   
     company_code = company_code.upper()
 
     checks: list[dict[str, Any]] = []
+
+    close_tasks = get_close_tasks(
+        company_code=company_code,
+        fiscal_year=fiscal_year,
+        period_number=period_number,
+    )
+
+    incomplete_tasks = [
+        task
+        for task in close_tasks
+        if task["status"] != "COMPLETED"
+    ]
+
+    checklist_passed = len(incomplete_tasks) == 0
+
+    checks.append(
+        {
+            "check": "CLOSE_CHECKLIST_COMPLETE",
+            "passed": checklist_passed,
+            "message": (
+                "All month-end close tasks are completed."
+                if checklist_passed
+                else f"{len(incomplete_tasks)} close task(s) remain incomplete."
+            ),
+        }
+    )
 
     # --------------------------------------------------
     # CHECK 1 - POSTING PERIOD EXISTS AND IS OPEN

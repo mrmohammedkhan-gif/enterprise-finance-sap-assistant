@@ -17,13 +17,6 @@ from fastapi import FastAPI, HTTPException
 
 from fastapi import HTTPException
 
-from src.posting_period_service import find_posting_period
-
-from src.close_task_service import (
-    get_close_tasks,
-    complete_close_task,
-)
-
 
 
 from mock_sap.tax_codes_data import (
@@ -206,6 +199,23 @@ def get_company_code(company_code: str) -> dict:
     return company
 
 
+@app.get("/posting-periods/{company_code}")
+def get_posting_period(
+    company_code: str,
+    fiscal_year: int,
+    period: int,
+) -> dict:
+    posting_period = next(
+        (
+            item
+            for item in POSTING_PERIODS
+            if item["company_code"].lower()
+            == company_code.lower()
+            and item["fiscal_year"] == fiscal_year
+            and item["period_number"] == period
+        ),
+        None,
+    )
 
     if posting_period is None:
         raise HTTPException(
@@ -1038,72 +1048,3 @@ def period_close(
             status_code=400,
             detail=str(error),
         ) from error
-
-
-@app.get("/close-tasks/{company_code}")
-def list_close_tasks(
-    company_code: str,
-    fiscal_year: int,
-    period_number: int,
-):
-    """
-    Return month-end close tasks for one Company Code and period.
-    """
-    return {
-        "company_code": company_code.upper(),
-        "fiscal_year": fiscal_year,
-        "period_number": period_number,
-        "tasks": get_close_tasks(
-            company_code=company_code,
-            fiscal_year=fiscal_year,
-            period_number=period_number,
-        ),
-    }
-
-
-@app.post("/close-tasks/{task_id}/complete")
-def complete_close_task_api(
-    task_id: str,
-    completed_by: str,
-):
-    """
-    Complete one month-end close task.
-    """
-    try:
-        return complete_close_task(
-            task_id=task_id,
-            completed_by=completed_by,
-        )
-
-    except ValueError as error:
-        raise HTTPException(
-            status_code=400,
-            detail=str(error),
-        ) from error
-
-@app.get("/posting-periods/{company_code}")
-def get_posting_period(
-    company_code: str,
-    fiscal_year: int,
-    period: int,
-) -> dict:
-    """
-    Return one posting-period record.
-    Persistent database state takes priority.
-    """
-    posting_period = find_posting_period(
-        company_code=company_code,
-        fiscal_year=fiscal_year,
-        period_number=period,
-    )
-
-    if posting_period is None:
-        raise HTTPException(
-            status_code=404,
-            detail=(
-                f"Posting period {period}/{fiscal_year} "
-                f"was not found for {company_code}."
-            ),
-        )
-
-    return posting_period
