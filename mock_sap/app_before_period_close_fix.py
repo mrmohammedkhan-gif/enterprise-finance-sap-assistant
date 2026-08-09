@@ -1,4 +1,4 @@
-﻿
+
 from mock_sap.trial_balance_data import calculate_trial_balance
 
 from mock_sap.posting_period_data import POSTING_PERIODS
@@ -1025,6 +1025,25 @@ def get_close_audit(company_code: str):
     }
 
 @app.post("/period-close")
+def period_close(
+    company_code: str,
+    fiscal_year: int,
+    period_number: int,
+    approved_by: str,
+):
+    """
+    Close an accounting period through the controlled
+    month-end close service.
+    """
+    return execute_period_close(
+        company_code=company_code,
+        fiscal_year=fiscal_year,
+        period_number=period_number,
+        approved_by=approved_by,
+    )
+
+
+ @app.post("/period-close")
 def period_close(
     company_code: str,
     fiscal_year: int,

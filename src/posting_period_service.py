@@ -5,6 +5,10 @@ from mock_sap.posting_period_data import (
     POSTING_PERIODS,
     PostingPeriod,
 )
+from src.close_persistence import (
+    get_persisted_posting_period,
+    save_posting_period,
+)
 
 
 def validate_period_number(
@@ -26,11 +30,23 @@ def find_posting_period(
     period_number: int,
 ) -> Optional[PostingPeriod]:
     """
-    Find one configured posting period.
+    Find one posting period.
+
+    Persistent database state takes priority over
+    the original in-memory configuration.
     """
     validate_period_number(period_number)
 
     company_code = company_code.upper()
+
+    persisted_period = get_persisted_posting_period(
+        company_code,
+        fiscal_year,
+        period_number,
+    )
+
+    if persisted_period is not None:
+        return persisted_period
 
     for posting_period in POSTING_PERIODS:
         if (
@@ -41,7 +57,6 @@ def find_posting_period(
             return posting_period
 
     return None
-
 
 def open_period(
     company_code: str,
@@ -73,14 +88,29 @@ def open_period(
 
         POSTING_PERIODS.append(posting_period)
 
-        return posting_period
+    else:
+        posting_period["status"] = "OPEN"
+        posting_period["opened_at"] = datetime.now()
+        posting_period["closed_at"] = None
 
-    posting_period["status"] = "OPEN"
-    posting_period["opened_at"] = datetime.now()
-    posting_period["closed_at"] = None
+    save_posting_period(
+        company_code=posting_period["company_code"],
+        fiscal_year=posting_period["fiscal_year"],
+        period_number=posting_period["period_number"],
+        status=posting_period["status"],
+        opened_at=(
+            posting_period["opened_at"].isoformat()
+            if isinstance(posting_period["opened_at"], datetime)
+            else posting_period["opened_at"]
+        ),
+        closed_at=(
+            posting_period["closed_at"].isoformat()
+            if isinstance(posting_period["closed_at"], datetime)
+            else posting_period["closed_at"]
+        ),
+    )
 
     return posting_period
-
 
 def close_period(
     company_code: str,
@@ -88,7 +118,7 @@ def close_period(
     period_number: int,
 ) -> PostingPeriod:
     """
-    Close an existing posting period.
+    Close an existing posting period and persist the change.
     """
     validate_period_number(period_number)
 
@@ -100,6 +130,33 @@ def close_period(
         period_number,
     )
 
+    if posting_period is None:
+        raise ValueError(
+            f"Posting period {period_number:02d}/{fiscal_year} "
+            f"does not exist for Company Code {company_code}."
+        )
+
+    posting_period["status"] = "CLOSED"
+    posting_period["closed_at"] = datetime.now()
+
+    save_posting_period(
+        company_code=posting_period["company_code"],
+        fiscal_year=posting_period["fiscal_year"],
+        period_number=posting_period["period_number"],
+        status=posting_period["status"],
+        opened_at=(
+            posting_period["opened_at"].isoformat()
+            if isinstance(posting_period["opened_at"], datetime)
+            else posting_period["opened_at"]
+        ),
+        closed_at=(
+            posting_period["closed_at"].isoformat()
+            if isinstance(posting_period["closed_at"], datetime)
+            else posting_period["closed_at"]
+        ),
+    )
+
+    return posting_period
     if posting_period is None:
         raise ValueError(
             f"Posting period {period_number:02d}/{fiscal_year} "
