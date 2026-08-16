@@ -1,15 +1,21 @@
+from pathlib import Path
+import sys
 import json
 
 import pandas as pd
-
 import streamlit as st
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from langchain_core.messages import AIMessage, HumanMessage
 
-from graph import finance_graph
+from src.graph import finance_graph
 from sap_client import SAPClient
 from tools import review_invoice_for_approval
-
-
+from src.close_copilot_service import get_ai_close_explanation
 
 st.set_page_config(
     page_title="Enterprise Finance AI Assistant",
@@ -737,3 +743,29 @@ else:
             )
 
             st.exception(exc)
+  
+st.markdown("#### AI Close Copilot")
+
+if st.button(
+    "Explain Close Position",
+    key="explain_close_position",
+):
+    try:
+        with st.spinner(
+            "Analysing month-end close position..."
+        ):
+            ai_explanation = get_ai_close_explanation(
+                company_code=close_company_code,
+                fiscal_year=int(close_fiscal_year),
+                period_number=int(close_period_number),
+            )
+
+        st.info(ai_explanation)
+
+    except Exception as exc:
+        st.error(
+            "The AI Close Copilot could not analyse "
+            "the selected accounting period."
+        )
+
+        st.exception(exc)
