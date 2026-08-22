@@ -64,9 +64,35 @@ def initialise_close_database() -> None:
             )
             """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS close_audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_code TEXT NOT NULL,
+                fiscal_year INTEGER NOT NULL,
+                period_number INTEGER NOT NULL,
+                action TEXT NOT NULL,
+                approved_by TEXT NOT NULL,
+                action_at TEXT NOT NULL,
+                readiness_status TEXT NOT NULL
+            )
+            """
+        )
 
-        connection.commit()
-
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS approval_requests (
+                request_id TEXT PRIMARY KEY,
+                tool_name TEXT NOT NULL,
+                company_code TEXT NOT NULL,
+                requested_by TEXT NOT NULL,
+                status TEXT NOT NULL,
+                approved_by TEXT,
+                created_at TEXT NOT NULL,
+                approved_at TEXT
+            )
+            """
+        )
     finally:
         connection.close()
 
