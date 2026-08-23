@@ -2,7 +2,6 @@ from typing import Any
 
 from mcp.server import MCPServer
 
-
 from mock_sap.app import (
     list_gl_balances,
     list_open_vendor_invoices,
@@ -37,8 +36,19 @@ def get_gl_balances(
 
     This is a READ_ONLY finance tool and remains subject
     to governance and RBAC controls.
-
     """
+
+    return execute_governed_tool(
+        tool_name="get_gl_balances",
+        tool_function=list_gl_balances,
+        tool_arguments={
+            "company_code": company_code,
+        },
+        user_id=user_id,
+        company_code=company_code,
+    )
+
+
 @mcp.tool()
 def get_vendor_invoices(
     company_code: str,
@@ -49,8 +59,19 @@ def get_vendor_invoices(
 
     This is a READ_ONLY finance tool and remains subject
     to governance and RBAC controls.
-
     """
+
+    return execute_governed_tool(
+        tool_name="get_vendor_invoices",
+        tool_function=list_open_vendor_invoices,
+        tool_arguments={
+            "company_code": company_code,
+        },
+        user_id=user_id,
+        company_code=company_code,
+    )
+
+
 @mcp.tool()
 def close_accounting_period(
     company_code: str,
@@ -79,16 +100,6 @@ def close_accounting_period(
             "approved_by": user_id,
         },
         approval_request_id=approval_request_id,
-        user_id=user_id,
-        company_code=company_code,
-    )
-  
-    return execute_governed_tool(
-        tool_name="get_gl_balances",
-        tool_function=list_gl_balances,
-        tool_arguments={
-            "company_code": company_code,
-        },
         user_id=user_id,
         company_code=company_code,
     )
