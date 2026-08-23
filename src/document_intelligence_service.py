@@ -21,7 +21,16 @@ def validate_invoice_document(
     """
 
     missing_fields = sorted(
-        REQUIRED_INVOICE_FIELDS - extracted_data.keys()
+        field
+        for field in REQUIRED_INVOICE_FIELDS
+        if (
+            field not in extracted_data
+            or extracted_data[field] is None
+            or (
+                isinstance(extracted_data[field], str)
+                and not extracted_data[field].strip()
+            )
+        )
     )
 
     if missing_fields:
