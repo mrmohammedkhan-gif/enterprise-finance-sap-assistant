@@ -13,6 +13,10 @@ from src.document_ingestion_adapter import (
     ingest_invoice_for_finance,
 )
 
+from src.document_extraction_provider import (
+    extract_invoice_document,
+)
+
 def inspect_document_file(
     file_path: str,
 ) -> dict[str, Any]:
@@ -78,4 +82,40 @@ def process_finance_document(
         "status": finance_result["status"],
         "file_result": file_result,
         "finance_result": finance_result,
+    }
+
+def ingest_finance_document_file(
+    file_path: str,
+) -> dict[str, Any]:
+    """
+    Validate a finance document file and send it to the
+    configured document-extraction provider.
+    """
+
+    file_result = inspect_document_file(
+        file_path
+    )
+
+    if file_result["status"] != "ACCEPTED":
+        return {
+            "status": "BLOCKED",
+            "reason": file_result["reason"],
+            "file_result": file_result,
+        }
+
+    extraction_result = extract_invoice_document(
+        file_path
+    )
+
+    if extraction_result["status"] != "EXTRACTED":
+        return {
+            "status": "EXTRACTION_PENDING",
+            "file_result": file_result,
+            "extraction_result": extraction_result,
+        }
+
+    return {
+        "status": "EXTRACTED",
+        "file_result": file_result,
+        "extraction_result": extraction_result,
     }
