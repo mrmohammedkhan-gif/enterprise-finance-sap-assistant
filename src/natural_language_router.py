@@ -1,12 +1,16 @@
 from typing import Any
 
 from src.agent_router import route_agent_request
+from src.finance_agent import run_finance_agent
 
 
 def route_natural_language_request(
     user_request: str,
     company_code: str,
     user_id: str,
+    fiscal_year: int | None = None,
+    period_number: int | None = None,
+    approval_request_id: str | None = None,
 ) -> dict[str, Any]:
     """
     Interpret a simple natural-language finance request
@@ -29,6 +33,16 @@ def route_natural_language_request(
             request_type="vendor_invoices",
             company_code=company_code,
             user_id=user_id,
+        )
+
+    if "close accounting period" in text or "close period" in text:
+        return run_finance_agent(
+            request_type="close_period",
+            company_code=company_code,
+            user_id=user_id,
+            fiscal_year=fiscal_year,
+            period_number=period_number,
+            approval_request_id=approval_request_id,
         )
 
     return {
