@@ -17,6 +17,10 @@ from src.document_extraction_provider import (
     extract_invoice_document,
 )
 
+from src.document_extraction_provider import (
+    extract_structured_invoice,
+)
+
 def inspect_document_file(
     file_path: str,
 ) -> dict[str, Any]:
@@ -118,4 +122,47 @@ def ingest_finance_document_file(
         "status": "EXTRACTED",
         "file_result": file_result,
         "extraction_result": extraction_result,
+    }
+
+def process_extracted_invoice_file(
+    file_path: str,
+) -> dict[str, Any]:
+    """
+    Process a real text-based PDF invoice through the complete
+    document-to-finance control pipeline.
+    """
+
+    file_result = inspect_document_file(
+        file_path
+    )
+
+    if file_result["status"] != "ACCEPTED":
+        return {
+            "status": "BLOCKED",
+            "reason": file_result["reason"],
+            "file_result": file_result,
+        }
+
+    extraction_result = extract_structured_invoice(
+        file_path
+    )
+
+    if extraction_result["status"] != "EXTRACTED":
+        return {
+            "status": "BLOCKED",
+            "reason": extraction_result["status"],
+            "file_result": file_result,
+            "extraction_result": extraction_result,
+        }
+
+    finance_result = ingest_invoice_for_finance(
+        raw_document=extraction_result["data"],
+        raw_confidence=extraction_result["confidence"],
+    )
+
+    return {
+        "status": finance_result["status"],
+        "file_result": file_result,
+        "extraction_result": extraction_result,
+        "finance_result": finance_result,
     }
