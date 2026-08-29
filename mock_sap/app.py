@@ -17,6 +17,8 @@ from fastapi import FastAPI, HTTPException
 
 from fastapi import HTTPException
 
+from mock_sap.organisation_data import COMPANY_CODES
+
 from src.posting_period_service import find_posting_period
 
 from src.close_task_service import (
