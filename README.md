@@ -114,7 +114,17 @@ The solution is structured around several logical layers:
 
 
 
-A detailed architecture diagram will be added separately as part of the project portfolio documentation.
+
+
+\### Solution Architecture
+
+
+
+The diagram below provides a high-level view of the completed Enterprise SAP Finance AI Assistant architecture, including the finance domain, API, AI/orchestration, data, governance, evaluation and observability layers.
+
+
+
+!\[Enterprise SAP Finance AI Assistant Architecture](docs/enterprise-sap-finance-ai-architecture.png)
 
 
 
